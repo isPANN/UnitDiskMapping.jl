@@ -7,7 +7,8 @@ using LuxorGraphPlot
 using LuxorGraphPlot.Luxor.Colors
 
 # Basic types
-export UnWeighted, Weighted
+export UnWeighted, Weighted, TriangularWeighted
+export SquareGrid, TriangularGrid
 export Cell, AbstractCell, SimpleCell
 export Node, WeightedNode, UnWeightedNode
 export graph_and_weights, GridGraph, coordinates
@@ -41,8 +42,8 @@ export pathwidth, PathDecompositionMethod, MinhThiTrick, Greedy
 
 @deprecate Branching MinhThiTrick
 
-include("utils.jl")
 include("Core.jl")
+include("utils.jl")
 include("pathdecomposition/pathdecomposition.jl")
 include("copyline.jl")
 include("dragondrop.jl")
@@ -51,6 +52,7 @@ include("logicgates.jl")
 include("gadgets.jl")
 include("mapping.jl")
 include("weighted.jl")
+include("triangular.jl")
 include("simplifiers.jl")
 include("extracting_results.jl")
 include("visualize.jl")

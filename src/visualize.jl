@@ -1,4 +1,18 @@
 # normalized to minimum weight and maximum weight
+
+# Helper function to convert grid coordinates to plot coordinates
+function plot_coordinates(gg::GridGraph, i::Int, j::Int, unit::Float64)
+    if is_triangular_grid(gg)
+        # Triangular grid layout: y = j * (√3 / 2), x = i + (iseven(j) ? 0.5 : 0.0)
+        x = (i + (isodd(j) ? 0.5 : 0.0)) * unit
+        y = j * (√3 / 2) * unit  # negative for downward y-axis
+        return (y, -x)
+    else
+        # Square grid layout (original)
+        return (j * unit, -i * unit)
+    end
+end
+
 function LuxorGraphPlot.show_graph(gg::GridGraph;
         format = :svg,
         filename = nothing,
@@ -18,10 +32,14 @@ function LuxorGraphPlot.show_graph(gg::GridGraph;
     xmin, xmax = extrema(first.(coos))
     ymin, ymax = extrema(last.(coos))
     nodestore() do ns
-        filledlocs = map(coo->circle!((unit * (coo[2] - 1), -unit * (coo[1] - 1)), config.vertex_size), coos)
+        # Use the new coordinate transformation for filled locations
+        filledlocs = map(coo->circle!(plot_coordinates(gg, coo[1], coo[2], unit), config.vertex_size), coos)
         emptylocs, edges = [], []
         for i=xmin:xmax, j=ymin:ymax
-            (i, j) ∉ coos && push!(emptylocs, circle!(((j-1) * unit, -(i-1) * unit), config.vertex_size/10))
+            if (i, j) ∉ coos
+                plot_pos = plot_coordinates(gg, i, j, unit)
+                push!(emptylocs, circle!(plot_pos, config.vertex_size/10))
+            end
         end
         for e in Graphs.edges(graph_and_weights(gg)[1])
             i, j = e.src, e.dst

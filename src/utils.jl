@@ -41,6 +41,30 @@ function unitdisk_graph(locs::AbstractVector, unit::Real)
     return g
 end
 
+function triangular_unitdisk_graph(locs::AbstractVector, unit::Real, parity::Bool=false)
+    # parity==false: crossing nodes on odd columns.
+    n = length(locs)
+    g = SimpleGraph(n)
+    physical_locs = physical_position.(locs, parity)
+    for i=1:n, j=i+1:n
+        if sum(abs2, physical_locs[i] .- physical_locs[j]) < unit ^ 2
+            add_edge!(g, i, j)
+        end
+    end
+    return g
+end
+
+function physical_position(node, parity=false)
+    i, j = node.loc
+    y = j * (√3 / 2)
+    if parity
+        x = i + (iseven(j) ? 0.5 : 0.0)
+    else
+        x = i + (isodd(j) ? 0.5 : 0.0)
+    end
+    return (x, y)
+end
+
 function is_independent_set(g::SimpleGraph, config)
     for e in edges(g)
         if config[e.src] == config[e.dst] == 1

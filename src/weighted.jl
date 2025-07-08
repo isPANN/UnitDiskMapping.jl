@@ -95,9 +95,9 @@ function move_center(w::WeightedGadgetTypes, nodexy, offset)
     error("center not found, source center = $(source_centers(w)), while offset = $(offset)")
 end
 
-trace_centers(r::MappingResult) = trace_centers(r.lines, r.padding, r.mapping_history)
-function trace_centers(lines, padding, tape)
-    center_locations = map(x->center_location(x; padding) .+ (0, 1), lines)
+trace_centers(r::MappingResult) = trace_centers(r.lines, r.padding, r.mapping_history, r.spacing)
+function trace_centers(lines, padding, tape, spacing=4)
+    center_locations = map(x->center_location(x; padding, s=spacing) .+ (0, 1), lines)
     for (gadget, i, j) in tape
         m, n = size(gadget)
         for (k, centerloc) in enumerate(center_locations)
@@ -122,12 +122,17 @@ function _map_configs_back(r::MappingResult{<:WeightedNode}, configs::AbstractVe
 end
 
 # simple rules for crossing gadgets
-for (GT, s1, m1, s3, m3) in [(:(Cross{true}), [], [], [], []), (:(Cross{false}), [], [], [], []),
-        (:(WTurn), [], [], [], []), (:(BranchFix), [], [], [], []), (:(Turn), [], [], [], []),
-        (:(TrivialTurn), [1, 2], [1, 2], [], []), (:(BranchFixB), [1], [1], [], []),
-        (:(EndTurn), [3], [1], [], []), (:(TCon), [2], [2], [], []),
-        (:(Branch), [], [], [4], [2]),
-        ]
+for (GT, s1, m1, s3, m3) in [
+    (:(Cross{true}), [], [], [], []), 
+    (:(Cross{false}), [], [], [], []),
+    (:(WTurn), [], [], [], []), 
+    (:(BranchFix), [], [], [], []), 
+    (:(Turn), [], [], [], []),
+    (:(TrivialTurn), [1, 2], [1, 2], [], []), 
+    (:(BranchFixB), [1], [1], [], []),
+    (:(EndTurn), [3], [1], [], []), 
+    (:(TCon), [2], [2], [], []),
+    (:(Branch), [], [], [4], [2]),]
     @eval function weighted(g::$GT)
         slocs, sg, spins = source_graph(g)
         mlocs, mg, mpins = mapped_graph(g)
