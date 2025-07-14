@@ -1,5 +1,3 @@
-# TODO: Some interface has changed. We need to update the code.
-
 using UnitDiskMapping, GenericTensorNetworks, Graphs
 
 function mapped_entry_to_compact(s::Pattern)
@@ -37,35 +35,11 @@ function source_entry_to_configs(s::Pattern)
     return d
 end
 
-# function compute_mis_overhead(s)
-#     locs1, g1, pins1 = source_graph(s)
-#     locs2, g2, pins2 = mapped_graph(s)
-#     m1 = mis_compactify!(solve(IndependentSet(g1, openvertices=pins1), SizeMax()))
-#     m2 = mis_compactify!(solve(IndependentSet(g2, openvertices=pins2), SizeMax()))
-#     @assert nv(g1) == length(locs1) && nv(g2) == length(locs2)
-#     sig, diff = UnitDiskMapping.is_diff_by_const(GenericTensorNetworks.content.(m1), GenericTensorNetworks.content.(m2))
-#     @assert sig
-#     return diff
-# end
-
 function compute_mis_overhead(s)
     locs1, g1, pins1 = source_graph(s)
     locs2, g2, pins2 = mapped_graph(s)
-    m1 = mis_compactify!(solve(IndependentSet(g1, ones(Int, length(locs1))), SizeMax()))
-    m2 = mis_compactify!(solve(IndependentSet(g2, ones(Int, length(locs2))), SizeMax()))
-    @assert nv(g1) == length(locs1) && nv(g2) == length(locs2)
-    sig, diff = UnitDiskMapping.is_diff_by_const(GenericTensorNetworks.content.(m1), GenericTensorNetworks.content.(m2))
-    @assert sig
-    return diff
-end
-
-function compute_mis_overhead_weighted(s)
-    weighted_s = UnitDiskMapping.weighted(s)
-    locs1, g1, pins1 = source_graph(s)
-    locs2, g2, pins2 = mapped_graph(s)
-    m1 = mis_compactify!(solve(IndependentSet(g1, weighted_s.source_weights), SizeMax()))
-    m2 = mis_compactify!(solve(IndependentSet(g2, weighted_s.mapped_weights), SizeMax()))
-    @show m1, m2
+    m1 = mis_compactify!(solve(IndependentSet(g1, openvertices=pins1), SizeMax()))
+    m2 = mis_compactify!(solve(IndependentSet(g2, openvertices=pins2), SizeMax()))
     @assert nv(g1) == length(locs1) && nv(g2) == length(locs2)
     sig, diff = UnitDiskMapping.is_diff_by_const(GenericTensorNetworks.content.(m1), GenericTensorNetworks.content.(m2))
     @assert sig

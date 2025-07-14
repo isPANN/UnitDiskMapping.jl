@@ -7,7 +7,7 @@ struct TriangularWeighted end
 
 # Get spacing value based on mode
 get_spacing(::Union{UnWeighted, Weighted}) = 4
-get_spacing(::TriangularWeighted) = 6
+get_spacing(::TriangularWeighted) = 14
 
 Base.@kwdef struct MCell{WT} <: AbstractCell{WT}
     occupied::Bool = true

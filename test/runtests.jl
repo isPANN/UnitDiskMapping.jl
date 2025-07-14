@@ -56,3 +56,7 @@ end
 @testset "reduceto" begin
     include("reduceto.jl")
 end
+
+@testset "triangular" begin
+    include("triangular.jl")
+end

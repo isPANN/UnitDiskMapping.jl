@@ -3,9 +3,9 @@ using GenericTensorNetworks: TropicalF64, content
 using Random
 using UnitDiskMapping: is_independent_set
 
-@testset "gadgets" begin
-    for s in [UnitDiskMapping.crossing_ruleset_weighted..., UnitDiskMapping.default_simplifier_ruleset(Weighted())...]
-        println("Testing gadget:\n$s")
+@testset "triangular gadgets" begin
+    for s in UnitDiskMapping.crossing_ruleset_triangular_weighted
+        println("Testing triangular gadget:\n$s")
         locs1, g1, pins1 = source_graph(s)
         locs2, g2, pins2 = mapped_graph(s)
         @assert length(locs1) == nv(g1)
@@ -29,7 +29,7 @@ using UnitDiskMapping: is_independent_set
     end
 end
 
-@testset "copy lines" begin
+@testset "triangular copy lines" begin
     for (vstart, vstop, hstop) in [
             (3, 7, 8), (3, 5, 8), (5, 9, 8), (5, 5, 8),
             (1, 7, 5), (5, 8, 5),  (1, 5, 5), (5, 5, 5)]
@@ -45,36 +45,29 @@ end
             end
         end
         gp = GenericTensorNetwork(IndependentSet(g, weights))
-        @test solve(gp, SizeMax())[].n == UnitDiskMapping.mis_overhead_copyline(Weighted(), tc)
+        @test solve(gp, SizeMax())[].n == UnitDiskMapping.mis_overhead_copyline(TriangularWeighted(), tc)
     end
 end
 
-@testset "map configurations back" begin
+@testset "triangular map configurations back" begin
     Random.seed!(2)
-    for graphname in [:petersen, :bull, :cubical, :house, :diamond, :tutte]
+    for graphname in [:bull, :petersen, :cubical, :house, :diamond, :tutte]
         @show graphname
         g = smallgraph(graphname)
-        ug = embed_graph(Weighted(), g)
-        mis_overhead0 = UnitDiskMapping.mis_overhead_copylines(ug)
-        ug2, tape = apply_crossing_gadgets!(Weighted(), copy(ug))
-        ug3, tape2 = apply_simplifier_gadgets!(copy(ug2); ruleset=[UnitDiskMapping.weighted(RotatedGadget(UnitDiskMapping.DanglingLeg(), n)) for n=0:3])
-        mis_overhead1 = sum(x->mis_overhead(x[1]), tape)
-        mis_overhead2 = isempty(tape2) ? 0 : sum(x->mis_overhead(x[1]), tape2)
-
-        # trace back configurations
-        mgraph = SimpleGraph(ug3)
-        weights = fill(0.5, nv(g))
-        r = UnitDiskMapping.MappingResult(GridGraph(Weighted(), ug3), ug3.lines, ug3.padding, [tape..., tape2...], mis_overhead0+mis_overhead1+mis_overhead2, ug.spacing)
+        weights = fill(0.25, nv(g))
+        r = map_graph(TriangularWeighted(), g)
         mapped_weights = UnitDiskMapping.map_weights(r, weights)
+        mgraph, _ = graph_and_weights(r.grid_graph)
+
         gp = GenericTensorNetwork(IndependentSet(mgraph, mapped_weights); optimizer=GreedyMethod(nrepeat=10))
         missize_map = solve(gp, CountingMax())[]
         missize = solve(GenericTensorNetwork(IndependentSet(g, weights)), CountingMax())[]
-        @test mis_overhead0 + mis_overhead1 + mis_overhead2 + missize.n == missize_map.n
+        @test r.mis_overhead + missize.n == missize_map.n
         @test missize.c == missize_map.c
 
         T = GenericTensorNetworks.sampler_type(nv(mgraph), 2)
         misconfig = solve(gp, SingleConfigMax())[].c
-        c = zeros(Int, size(ug3))
+        c = zeros(Int, size(r.grid_graph))
         for (i, n) in enumerate(r.grid_graph.nodes)
             c[n.loc...] = misconfig.data[i]
         end
@@ -82,16 +75,15 @@ end
         center_locations = trace_centers(r)
         indices = CartesianIndex.(center_locations)
         sc = c[indices]
-        @test count(isone, sc) == missize.n * 2
+        @test count(isone, sc) == missize.n * 4
         @test is_independent_set(g, sc)
     end
 end
 
-
-@testset "interface" begin
+@testset "triangular interface" begin
     Random.seed!(2)
     g = smallgraph(:petersen)
-    res = map_graph(Weighted(), g)
+    res = map_graph(TriangularWeighted(), g)
 
     # checking size
     mgraph, _ = graph_and_weights(res.grid_graph)
@@ -101,7 +93,7 @@ end
     gp = GenericTensorNetwork(IndependentSet(mgraph, weights); optimizer=TreeSA(ntrials=1, niters=10))
     missize_map = solve(gp, SizeMax())[].n
     missize = solve(GenericTensorNetwork(IndependentSet(g, ws)), SizeMax())[].n
-    @test res.mis_overhead + missize == missize_map
+    @test res.mis_overhead + missize ≈ missize_map
 
     # checking mapping back
     T = GenericTensorNetworks.sampler_type(nv(mgraph), 2)

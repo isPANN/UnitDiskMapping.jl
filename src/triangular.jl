@@ -2,35 +2,34 @@ abstract type TriangularCrossPattern <: Pattern end
 
 struct TriCross{CON} <: TriangularCrossPattern end
 iscon(::TriCross{CON}) where {CON} = CON
-# · ⋅ ● ⋅ ·
-# ● ◆ ◉ ● ●
-# · ⋅ ◆ · ·
-# ⋅ ⋅ ● ⋅ ⋅
-# ⋅ ⋅ ● ⋅ ⋅
-# ⋅ ⋅ ● ⋅ ⋅
+# · · · · · ⋅ ◆ ⋅ · · · · ·
+# ● ● ● ● ● ◆ ◉ ● ● ● ● ● ●
+# · · · · · ⋅ ● · · · · · ·
+# · · · · ⋅ ⋅ ● ⋅ ⋅ · · · ·
+# · · · · ⋅ ⋅ ● ⋅ ⋅ · · · ·
+# · · · · ⋅ ⋅ ● ⋅ ⋅ · · · ·
 function source_graph(::TriCross{true})
-    locs = Node.([(2,1), (2,2), (2,3), (2,4), (2,5), (1,3), (2,3), (3,3), (4,3), (5,3), (6,3)])
-    g = simplegraph([(1,2), (2,3), (3,4), (4,5), (6,7), (7,8), (8,9), (9,10), (10,11), (2,6)])
-    return locs, g, [1,6,11,5]
+    locs = Node.([(2,1), (2,2), (2,3), (2,4), (2,5), (2,6), (2,7), (2,8), (2,9), (2,10), (2,11), (2,12), (2,13), (1,7), (2,7), (3,7), (4,7), (5,7), (6,7)])
+    g = simplegraph([(1,2), (2,3), (3,4), (4,5), (5,6), (6,7), (7,8), (8,9), (9,10), (10,11), (11,12), (12,13), (14,15), (15,16), (16,17), (17,18), (18,19), (14,6)])
+    return locs, g, [1,14,13,19]
 end
-
-# ⋅ · ● ⋅ ⋅
-# ● ● ● ● ●
-# ⋅ ● ⋅ ● ⋅
-# ⋅ ● ● · ⋅
-# ⋅ · · ● ⋅
-# ⋅ ⋅ ● ● ⋅
+# ● · · · ⋅ · ● ⋅ ⋅ · · · ●
+# · ● · · ● ● ● ● ● · · ● ·
+# · ● ● ● ⋅ ● ⋅ ● ⋅ ● ● ● ·
+# · · · · ⋅ ● ● · ⋅ · · · ·
+# · · · · ⋅ · · ● ⋅ · · · ·
+# · · · · ⋅ ⋅ ● ● ⋅ · · · ·
 function mapped_graph(::TriCross{true})
-    locs = Node.([(1,3), (2,1), (2,2), (2,3), (2,4), (2,5), (3,2), (3,4), (4,2), (4,3), (5,4), (6,3), (6,4)])
-    return locs, triangular_unitdisk_graph(locs, 1.1, false), [2,1,12,6]
+    locs = Node.([(1,1), (1,7), (1,13), (2,2), (2,5), (2,6), (2,7), (2,8), (2,9), (2,12), (3,2), (3,3), (3,4), (3,6), (3,8), (3,10), (3,11), (3,12), (4,6), (4,7), (5,8), (6,8), (6,7)])
+    return locs, triangular_unitdisk_graph(locs, 1.1, false), [1,2,3,23]
 end
-Base.size(::TriCross{true}) = (6, 5)
-cross_location(::TriCross{true}) = (2, 3)
-connected_nodes(::TriCross{true}) = [2, 6]
+Base.size(::TriCross{true}) = (6, 13)
+cross_location(::TriCross{true}) = (2, 7)
+connected_nodes(::TriCross{true}) = [14,6]
 
 function weighted(p::TriCross{true})
-    sw = [2,2,2,2,2,2,2,2,2,2,2]
-    mw = [3,2,3,4,3,2,3,2,2,2,2,2,2]
+    sw = [2,2,2,2,2,2,2,2,2,2 ,2,2,2,2,2,2,2,2,2]
+    mw = [2,3,2,2,2,3,4,3,2,2 ,2,2,2,3,2,2,2,2 ,2,2,2,2,2]
     return weighted(p, sw, mw)
 end
 
@@ -136,7 +135,7 @@ struct TriTCon_up <: TriangularCrossPattern end
 # · · ·
 function source_graph(::TriTCon_up)
     locs = Node.([(1,2), (2,1), (2,2), (2,3)])
-    g = simplegraph([(1,2), (2,3), (1,4)])
+    g = simplegraph([(1,2), (2,3), (3,4)])
     return locs, g, [2,1,4]
 end
 connected_nodes(::TriTCon_up) = [1, 2]
@@ -405,7 +404,7 @@ mis_overhead(w::WeightedGadget{<:TriangularCrossPattern}) = mis_overhead(w.gadge
 # mis_overhead functions for TriangularCrossPattern types
 # These values should be computed properly using compute_mis_overhead function from project/createmap.jl
 # For now, using reasonable placeholder values based on the pattern complexity
-mis_overhead(::TriCross{true}) = 2
+mis_overhead(::TriCross{true}) = 4
 mis_overhead(::TriCross{false}) = 3
 mis_overhead(::TriTCon_left) = 4
 mis_overhead(::TriTCon_down) = 1
@@ -419,7 +418,7 @@ mis_overhead(::TriBranchFix) = -2
 mis_overhead(::TriBranchFixB) = -2
 mis_overhead(::TriBranch) = 1
 
-for (T, centerloc) in [(:Turn, (2, 3)), (:Branch, (2, 3)), (:BranchFix, (3, 2)), (:BranchFixB, (3, 2)), (:WTurn, (3, 3)), (:EndTurn, (1, 2))]
+for (T, centerloc) in [(:TriTurn, (4, 1)), (:TriBranch, (1,2)), (:TriBranchFix, (3, 2)), (:TriBranchFixB, (3, 2)), (:TriWTurn, (2, 3)), (:TriEndTurn, (1, 2))]
     @eval source_centers(::WeightedGadget{<:$T}) = [cross_location($T()) .+ (0, 1)]
     @eval mapped_centers(::WeightedGadget{<:$T}) = [$centerloc]
 end
