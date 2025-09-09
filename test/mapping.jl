@@ -41,7 +41,7 @@ end
         mis_overhead1 = sum(x->mis_overhead(x[1]), tape)
         mis_overhead2 = sum(x->mis_overhead(x[1]), tape2)
         @show mis_overhead2
-        gp = GenericTensorNetwork(IndependentSet(SimpleGraph(ug3)); optimizer=GreedyMethod(nrepeat=10))
+        gp = GenericTensorNetwork(IndependentSet(SimpleGraph(ug3)))
         missize_map = solve(gp, SizeMax())[].n
         missize = solve(GenericTensorNetwork(IndependentSet(g)), SizeMax())[].n
         @test mis_overhead0 + mis_overhead1 + mis_overhead2 + missize == missize_map

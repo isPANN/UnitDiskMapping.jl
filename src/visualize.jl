@@ -1,16 +1,15 @@
 # normalized to minimum weight and maximum weight
 
-# Helper function to convert grid coordinates to plot coordinates
+"""
+    plot_coordinates(gg::GridGraph, i::Int, j::Int, unit::Float64)
+
+Map grid coordinates to plot coordinates using the physical position
+for the grid type, then rotate to plotting frame.
+"""
 function plot_coordinates(gg::GridGraph, i::Int, j::Int, unit::Float64)
-    if is_triangular_grid(gg)
-        # Triangular grid layout: y = j * (√3 / 2), x = i + (iseven(j) ? 0.5 : 0.0)
-        x = (i + (isodd(j) ? 0.5 : 0.0)) * unit
-        y = j * (√3 / 2) * unit  # negative for downward y-axis
-        return (y, -x)
-    else
-        # Square grid layout (original)
-        return (j * unit, -i * unit)
-    end
+    # Use unified physical coordinates for both grid types
+    x, y = physical_position(Node(i, j), gg.gridtype)
+    return (y * unit, -x * unit)
 end
 
 function LuxorGraphPlot.show_graph(gg::GridGraph;

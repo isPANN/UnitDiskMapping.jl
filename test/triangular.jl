@@ -34,7 +34,7 @@ end
             (3, 7, 8), (3, 5, 8), (5, 9, 8), (5, 5, 8),
             (1, 7, 5), (5, 8, 5),  (1, 5, 5), (5, 5, 5)]
         tc = UnitDiskMapping.CopyLine(1, 5, 5, vstart, vstop, hstop)
-        locs = UnitDiskMapping.copyline_locations(UnitDiskMapping.WeightedNode, tc; padding=2)
+        locs = UnitDiskMapping.copyline_locations(UnitDiskMapping.WeightedNode, tc, 2, UnitDiskMapping.get_spacing(TriangularWeighted()))
         g = SimpleGraph(length(locs))
         weights = getfield.(locs, :weight)
         for i=1:length(locs)-1
@@ -45,7 +45,7 @@ end
             end
         end
         gp = GenericTensorNetwork(IndependentSet(g, weights))
-        @test solve(gp, SizeMax())[].n == UnitDiskMapping.mis_overhead_copyline(TriangularWeighted(), tc)
+        @test solve(gp, SizeMax())[].n == UnitDiskMapping.mis_overhead_copyline(TriangularWeighted(), tc, UnitDiskMapping.get_spacing(TriangularWeighted()))
     end
 end
 
@@ -54,15 +54,15 @@ end
     for graphname in [:bull, :petersen, :cubical, :house, :diamond, :tutte]
         @show graphname
         g = smallgraph(graphname)
-        weights = fill(0.25, nv(g))
+        weights = fill(0.2, nv(g))
         r = map_graph(TriangularWeighted(), g)
         mapped_weights = UnitDiskMapping.map_weights(r, weights)
         mgraph, _ = graph_and_weights(r.grid_graph)
-
-        gp = GenericTensorNetwork(IndependentSet(mgraph, mapped_weights); optimizer=GreedyMethod(nrepeat=10))
+        gp = GenericTensorNetwork(IndependentSet(mgraph, round.(Int, mapped_weights .* 10)))
         missize_map = solve(gp, CountingMax())[]
-        missize = solve(GenericTensorNetwork(IndependentSet(g, weights)), CountingMax())[]
-        @test r.mis_overhead + missize.n == missize_map.n
+
+        missize = solve(GenericTensorNetwork(IndependentSet(g, round.(Int, weights .* 10))), CountingMax())[]
+        @test r.mis_overhead + missize.n / 10 ≈ missize_map.n / 10
         @test missize.c == missize_map.c
 
         T = GenericTensorNetworks.sampler_type(nv(mgraph), 2)
@@ -75,7 +75,7 @@ end
         center_locations = trace_centers(r)
         indices = CartesianIndex.(center_locations)
         sc = c[indices]
-        @test count(isone, sc) == missize.n * 4
+        @test count(isone, sc) ≈ (missize.n / 10) * 5
         @test is_independent_set(g, sc)
     end
 end

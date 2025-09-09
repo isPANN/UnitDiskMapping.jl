@@ -29,7 +29,8 @@ makedocs(;
         "Home" => "index.md",
         "Examples" => [
             "generated/tutorial.md",
-            "generated/unweighted.md"
+            "generated/unweighted.md",
+            "generated/weighted_lattice_comparison.md"
         ],
         "Reference" => "ref.md",
     ],

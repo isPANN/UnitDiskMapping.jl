@@ -41,11 +41,10 @@ function unitdisk_graph(locs::AbstractVector, unit::Real)
     return g
 end
 
-function triangular_unitdisk_graph(locs::AbstractVector, unit::Real, parity::Bool=false)
-    # parity==false: crossing nodes on odd columns.
+function triangular_unitdisk_graph(locs::AbstractVector, unit::Real, grid_type::TriangularGrid=TriangularGrid())
     n = length(locs)
     g = SimpleGraph(n)
-    physical_locs = physical_position.(locs, parity)
+    physical_locs = [physical_position(node, grid_type) for node in locs]
     for i=1:n, j=i+1:n
         if sum(abs2, physical_locs[i] .- physical_locs[j]) < unit ^ 2
             add_edge!(g, i, j)
@@ -54,12 +53,44 @@ function triangular_unitdisk_graph(locs::AbstractVector, unit::Real, parity::Boo
     return g
 end
 
-function physical_position(node, parity=false)
+"""
+    physical_position(node, grid_type)
+
+Convert grid coordinates to physical coordinates for distance calculations.
+
+# Arguments
+- `node`: A `Node` instance
+- `grid_type`: A subtype of `AbstractGridType` specifying the grid geometry
+
+# Returns
+- Tuple `(x, y)` representing physical coordinates
+
+# Grid type behaviors
+- `SquareGrid`: Physical position equals grid position
+- `TriangularGrid`: Maps to equilateral triangular lattice with appropriate column offsets
+
+# Examples
+```julia
+node = Node((3, 4))
+square_pos = physical_position(node, SquareGrid())          # (3.0, 4.0)
+tri_pos = physical_position(node, TriangularGrid())         # (3.0, 3.464...)
+tri_pos_alt = physical_position(node, TriangularGrid(true)) # (3.5, 3.464...)
+```
+"""
+function physical_position(node::Node, ::SquareGrid)
+    # For square grids, coordinates are already physical positions
+    return float.(node.loc)
+end
+
+function physical_position(node::Node, grid::TriangularGrid)
+    # For triangular grids, use the grid's offset setting to create equilateral triangles
     i, j = node.loc
-    y = j * (√3 / 2)
-    if parity
+    y = j * (√3 / 2)  # Vertical spacing for equilateral triangles
+    if grid.offset_even_cols
+        # add offset to even columns
         x = i + (iseven(j) ? 0.5 : 0.0)
     else
+        # add offset to odd columns (default behavior)
         x = i + (isodd(j) ? 0.5 : 0.0)
     end
     return (x, y)

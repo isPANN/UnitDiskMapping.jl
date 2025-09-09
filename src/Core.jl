@@ -57,11 +57,60 @@ const WeightedNode{T<:Real} = Node{T}
 const UnWeightedNode = Node{ONE}
 
 ############################ Grid Types ############################
-# Abstract grid geometry types
+"""
+Abstract base type for grid geometries.
+
+Grid types define how coordinates are mapped to physical positions for distance calculations.
+"""
 abstract type AbstractGridType end
 
+"""
+    SquareGrid <: AbstractGridType
+
+A square lattice grid where coordinates directly correspond to physical positions.
+For a node at grid position (i, j), the physical position is (i, j).
+"""
 struct SquareGrid <: AbstractGridType end
-struct TriangularGrid <: AbstractGridType end
+
+"""
+    TriangularGrid <: AbstractGridType
+
+A triangular lattice grid where nodes form an equilateral triangular pattern.
+
+# Fields
+- `offset_even_cols::Bool`: Whether even-numbered columns are offset vertically.
+  - `false` (default): Odd columns are offset by 0.5 units vertically
+  - `true`: Even columns are offset by 0.5 units vertically
+
+# Physical positioning
+For a node at grid position (i, j):
+- y-coordinate: `j * (√3 / 2)` (maintains equilateral triangle geometry)
+- x-coordinate: `i + offset` where offset depends on `offset_even_cols`:
+  - If `offset_even_cols = false`: offset = `0.5` if j is odd, `0.0` if j is even
+  - If `offset_even_cols = true`: offset = `0.5` if j is even, `0.0` if j is odd
+
+# Examples
+```julia
+# Default triangular grid (odd columns offset)
+grid1 = TriangularGrid()       # equivalent to TriangularGrid(false)
+
+# Even columns offset
+grid2 = TriangularGrid(true)
+```
+"""
+struct TriangularGrid <: AbstractGridType 
+    offset_even_cols::Bool
+    
+    """
+        TriangularGrid(offset_even_cols::Bool=false)
+    
+    Create a triangular grid with specified column offset pattern.
+    
+    # Arguments
+    - `offset_even_cols`: If true, even columns are offset by 0.5; if false (default), odd columns are offset.
+    """
+    TriangularGrid(offset_even_cols::Bool=false) = new(offset_even_cols)
+end
 
 ############################ GridGraph ############################
 # Main definition
@@ -71,9 +120,6 @@ struct GridGraph{NT<:Node, GT<:AbstractGridType}
     nodes::Vector{NT}
     radius::Float64
 end
-
-is_square_grid(g::GridGraph) = g.gridtype isa SquareGrid
-is_triangular_grid(g::GridGraph) = g.gridtype isa TriangularGrid
 
 # Base constructors (for any node/grid type)
 GridGraph(size::Tuple{Int,Int}, nodes::Vector{NT}, radius::Real) where {NT<:Node} =
@@ -89,49 +135,20 @@ function Base.show(io::IO, grid::GridGraph)
 end
 Base.size(gg::GridGraph) = gg.size
 Base.size(gg::GridGraph, i::Int) = gg.size[i]
+
 function graph_and_weights(grid::GridGraph)
-    if is_triangular_grid(grid)
-        # For triangular grids, use physical positions
-        physical_locs = [physical_position(node) for node in grid.nodes]
-        return unit_disk_graph(physical_locs, grid.radius), getfield.(grid.nodes, :weight)
-    else
-        # For square grids, use original coordinates
-        return unit_disk_graph(getfield.(grid.nodes, :loc), grid.radius), getfield.(grid.nodes, :weight)
-    end
+    # Use physical positions for both grid types
+    physical_locs = [physical_position(node, grid.gridtype) for node in grid.nodes]
+    return unitdisk_graph(physical_locs, grid.radius), getfield.(grid.nodes, :weight)
 end
+
 function Graphs.SimpleGraph(grid::GridGraph{Node{ONE}, GT}) where GT
-    if is_triangular_grid(grid)
-        # For triangular grids, use physical positions
-        physical_locs = [physical_position(node) for node in grid.nodes]
-        return unit_disk_graph(physical_locs, grid.radius)
-    else
-        # For square grids, use original coordinates
-        return unit_disk_graph(getfield.(grid.nodes, :loc), grid.radius)
-    end
+    physical_locs = [physical_position(node, grid.gridtype) for node in grid.nodes]
+    return unitdisk_graph(physical_locs, grid.radius)
 end
 coordinates(grid::GridGraph) = getfield.(grid.nodes, :loc)
-
-# Neighbor calculation with runtime grid type dispatch
-function Graphs.neighbors(g::GridGraph, i::Int)
-    if is_triangular_grid(g)
-        # Use physical positions for triangular grid distance calculation
-        [j for j in 1:nv(g) if i != j && triangular_distance(g.nodes[i], g.nodes[j]) <= g.radius]
-    else
-        # Default square grid calculation
-        [j for j in 1:nv(g) if i != j && distance(g.nodes[i], g.nodes[j]) <= g.radius]
-    end
-end
-
-distance(n1::Node, n2::Node) = sqrt(sum(abs2, n1.loc .- n2.loc))
-
-# Distance calculation for triangular grids using physical positions
-function triangular_distance(n1::Node, n2::Node)
-    # Convert to physical positions as in triangular.jl
-    p1 = physical_position(n1)
-    p2 = physical_position(n2)
-    return sqrt(sum(abs2, p1.loc .- p2.loc))
-end
-
+Graphs.neighbors(g::GridGraph, i::Int) = [j for j in 1:nv(g) if i != j && distance(g.nodes[i], g.nodes[j], g.gridtype) <= g.radius]
+distance(n1::Node, n2::Node, grid_type::AbstractGridType) = sqrt(sum(abs2, physical_position(n1, grid_type) .- physical_position(n2, grid_type)))
 Graphs.nv(g::GridGraph) = length(g.nodes)
 Graphs.vertices(g::GridGraph) = 1:nv(g)
 

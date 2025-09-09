@@ -97,7 +97,7 @@ end
 
 trace_centers(r::MappingResult) = trace_centers(r.lines, r.padding, r.mapping_history, r.spacing)
 function trace_centers(lines, padding, tape, spacing=4)
-    center_locations = map(x->center_location(x; padding, s=spacing) .+ (0, 1), lines)
+    center_locations = map(x->center_location(x, padding, spacing) .+ (0, 1), lines)
     for (gadget, i, j) in tape
         m, n = size(gadget)
         for (k, centerloc) in enumerate(center_locations)

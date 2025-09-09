@@ -1,13 +1,35 @@
-# UnWeighted mode
+# Constants for grid parameters
+const DEFAULT_SQUARE_SPACING = 4
+const DEFAULT_TRIANGULAR_SPACING = 6
+const DEFAULT_PADDING = 2
+const SQUARE_UNIT_RADIUS = 1.5
+const TRIANGULAR_UNIT_RADIUS = 1.1
+
+# Mode types
 struct UnWeighted end
-# Weighted mode
 struct Weighted end
-# TriangularWeighted mode
 struct TriangularWeighted end
 
+# Spacing structure to handle different spacing for different directions
+struct GridSpacing
+    row_spacing::Int    # N direction
+    col_spacing::Int    # M direction
+end
+
+# Constructor for uniform spacing
+GridSpacing(s::Int) = GridSpacing(s, s)
+
 # Get spacing value based on mode
-get_spacing(::Union{UnWeighted, Weighted}) = 4
-get_spacing(::TriangularWeighted) = 14
+get_spacing(::Union{UnWeighted, Weighted}) = GridSpacing(DEFAULT_SQUARE_SPACING)
+get_spacing(::TriangularWeighted) = GridSpacing(DEFAULT_TRIANGULAR_SPACING)
+
+# Helper functions to get individual spacing values
+row_spacing(s::GridSpacing) = s.row_spacing
+col_spacing(s::GridSpacing) = s.col_spacing
+
+# Add Base methods for GridSpacing
+Base.:(==)(s1::GridSpacing, s2::GridSpacing) = s1.row_spacing == s2.row_spacing && s1.col_spacing == s2.col_spacing
+Base.hash(s::GridSpacing, h::UInt) = hash((s.row_spacing, s.col_spacing), h)
 
 Base.@kwdef struct MCell{WT} <: AbstractCell{WT}
     occupied::Bool = true
@@ -69,7 +91,7 @@ struct MappingGrid{CT<:AbstractCell}
     lines::Vector{CopyLine}
     padding::Int
     content::Matrix{CT}
-    spacing::Int
+    spacing::GridSpacing
 end
 
 Base.:(==)(ug::MappingGrid{CT}, ug2::MappingGrid{CT}) where CT = ug.lines == ug2.lines && ug.content == ug2.content && ug.spacing == ug2.spacing
@@ -96,16 +118,16 @@ function Graphs.SimpleGraph(ug::MappingGrid)
     if any(x->x.doubled || x.connected, ug.content)
         error("This mapping is not done yet!")
     end
-    return unitdisk_graph(coordinates(ug), 1.5)
+    return unitdisk_graph(coordinates(ug), SQUARE_UNIT_RADIUS)
 end
 function GridGraph(mode, ug::MappingGrid)
     if any(x->x.doubled || x.connected, ug.content)
         error("This mapping is not done yet!")
     end
     if mode isa TriangularWeighted
-        return GridGraph(TriangularGrid(), size(ug), [Node((i,j), ug.content[i,j].weight) for (i, j) in coordinates(ug)], 1.1)
+        return GridGraph(TriangularGrid(), size(ug), [Node((i,j), ug.content[i,j].weight) for (i, j) in coordinates(ug)], TRIANGULAR_UNIT_RADIUS)
     else
-        return GridGraph(size(ug), [Node((i,j), ug.content[i,j].weight) for (i, j) in coordinates(ug)], 1.5)
+        return GridGraph(size(ug), [Node((i,j), ug.content[i,j].weight) for (i, j) in coordinates(ug)], SQUARE_UNIT_RADIUS)
     end
 end
 
@@ -197,7 +219,7 @@ end
 function map_config_copyback!(ug::MappingGrid, c::AbstractMatrix)
     res = zeros(Int, length(ug.lines))
     for line in ug.lines
-        locs = copyline_locations(nodetype(ug), line; padding=ug.padding)
+        locs = copyline_locations(nodetype(ug), line, ug.padding, ug.spacing)
         count = 0
         for (iloc, loc) in enumerate(locs)
             gi, ci = ug.content[loc...], c[loc...]
@@ -241,19 +263,26 @@ function remove_order(g::AbstractGraph, vertex_order::AbstractVector{Int})
     return addremove
 end
 
-function center_location(tc::CopyLine; padding::Int, s::Int=4)
-    I = s*(tc.hslot-1)+padding+2
-    J = s*(tc.vslot-1)+padding+1
+function center_location(tc::CopyLine, padding::Int, s::Union{Int, GridSpacing})
+    spacing = s isa Int ? GridSpacing(s) : s
+    row_s = row_spacing(spacing)
+    col_s = col_spacing(spacing)
+    I = row_s*(tc.hslot-1)+padding+2
+    J = col_s*(tc.vslot-1)+padding+1
     return I, J
 end
 
 # NT is node type
-function copyline_locations(::Type{NT}, tc::CopyLine; padding::Int, s::Int=4) where NT
+# Low-level API: explicit parameters required, no defaults [[memory:3852344]]
+function copyline_locations(::Type{NT}, tc::CopyLine, padding::Int, s::Union{Int, GridSpacing}) where NT
     nline = 0
-    I, J = center_location(tc; padding=padding, s=s)
+    spacing = s isa Int ? GridSpacing(s) : s
+    row_s = row_spacing(spacing)
+    col_s = col_spacing(spacing)
+    I, J = center_location(tc, padding, s)
     locations = NT[]
     # grow up
-    start = I+s*(tc.vstart-tc.hslot)+1
+    start = I+row_s*(tc.vstart-tc.hslot)+1
     if tc.vstart < tc.hslot
         nline += 1
     end
@@ -261,7 +290,7 @@ function copyline_locations(::Type{NT}, tc::CopyLine; padding::Int, s::Int=4) wh
         push!(locations, node(NT, i, J, 1+(i!=start)))   # half weight on last node
     end
     # grow down
-    stop = I+s*(tc.vstop-tc.hslot)-1
+    stop = I+row_s*(tc.vstop-tc.hslot)-1
     if tc.vstop > tc.hslot
         nline += 1
     end
@@ -273,7 +302,7 @@ function copyline_locations(::Type{NT}, tc::CopyLine; padding::Int, s::Int=4) wh
         end
     end
     # grow right
-    stop = J+s*(tc.hstop-tc.vslot)-1
+    stop = J+col_s*(tc.hstop-tc.vslot)-1
     if tc.hstop > tc.vslot
         nline += 1
     end
@@ -290,19 +319,19 @@ nodetype(::UnWeighted) = UnWeightedNode
 nodetype(::TriangularWeighted) = WeightedNode{Int}
 node(::Type{<:UnWeightedNode}, i, j, w) = Node(i, j)
 
-function ugrid(mode, g::SimpleGraph, vertex_order::AbstractVector{Int}; padding=2, nrow=nv(g))
-    @assert padding >= 2
+function ugrid(mode, g::SimpleGraph, vertex_order::AbstractVector{Int}; padding::Int=DEFAULT_PADDING, nrow::Int=nv(g))
+    @assert padding >= DEFAULT_PADDING
     # create an empty canvas
     n = nv(g)
     s = get_spacing(mode)
-    N = (n-1)*s+2+2*padding
-    M = nrow*s+2+2*padding
+    N = (n-1)*s.col_spacing+2+2*padding
+    M = nrow*s.row_spacing+2+2*padding
     u = fill(empty(mode isa Union{Weighted, TriangularWeighted} ? MCell{Int} : MCell{ONE}), M, N)
 
     # add T-copies
     copylines = create_copylines(g, vertex_order)
     for tc in copylines
-        for loc in copyline_locations(nodetype(mode), tc; padding=padding, s=s)
+        for loc in copyline_locations(nodetype(mode), tc, padding, s)
             add_cell!(u, loc)
         end
     end
@@ -324,7 +353,7 @@ function crossat(ug::MappingGrid, v, w)
     i, j = minmax(i, j)
     hslot = ug.lines[i].hslot
     s = ug.spacing
-    return (hslot-1)*s+2+ug.padding, (j-1)*s+1+ug.padding
+    return (hslot-1)*s.row_spacing+2+ug.padding, (j-1)*s.col_spacing+1+ug.padding
 end
 
 """
@@ -345,7 +374,7 @@ function embed_graph(mode, g::SimpleGraph; vertex_order=MinhThiTrick())
     end
     # we reverse the vertex order of the pathwidth result,
     # because this order corresponds to the vertex-seperation.
-    ug = ugrid(mode, g, L.vertices[end:-1:1]; padding=2, nrow=L.vsep+1)
+    ug = ugrid(mode, g, L.vertices[end:-1:1]; padding=DEFAULT_PADDING, nrow=L.vsep+1)
     return ug
 end
 
@@ -355,13 +384,16 @@ function mis_overhead_copylines(ug::MappingGrid{WC}) where {WC}
     end
 end
 
-function mis_overhead_copyline(w::W, line::CopyLine, s::Int=4) where W
+function mis_overhead_copyline(w::W, line::CopyLine, s::Union{Int, GridSpacing}) where W
+    spacing = s isa Int ? GridSpacing(s) : s
     if W === Weighted || W === TriangularWeighted
-        return (line.hslot - line.vstart) * s +
-            (line.vstop - line.hslot) * s +
-            max((line.hstop - line.vslot) * s - 2, 0)
+        row_s = row_spacing(spacing)
+        col_s = col_spacing(spacing)
+        return (line.hslot - line.vstart) * row_s +
+            (line.vstop - line.hslot) * row_s +
+            max((line.hstop - line.vslot) * col_s - 2, 0)
     else
-        locs = copyline_locations(nodetype(w), line; padding=2, s=s)
+        locs = copyline_locations(nodetype(w), line, DEFAULT_PADDING, s)
         @assert length(locs) % 2 == 1
         return length(locs) ÷ 2
     end
@@ -374,7 +406,7 @@ struct MappingResult{NT}
     padding::Int
     mapping_history::Vector{Tuple{Pattern,Int,Int}}
     mis_overhead::Int
-    spacing::Int
+    spacing::GridSpacing
 end
 
 """
@@ -405,6 +437,8 @@ function map_graph(mode, g::SimpleGraph; vertex_order=MinhThiTrick(), ruleset=de
     ug = embed_graph(mode, g; vertex_order=vertex_order)
     mis_overhead0 = mis_overhead_copylines(ug)
     ug, tape = apply_crossing_gadgets!(mode, ug)
+    
+    # Note that apply_simplifier_gadgets! has not been specifically developed for the triangular lattice. However, the currently implemented components are also applicable to the triangular lattice and can provide a certain degree of simplification. Further development should take this into consideration. 
     ug, tape2 = apply_simplifier_gadgets!(ug; ruleset=ruleset)
     mis_overhead1 = isempty(tape) ? 0 : sum(x->mis_overhead(x[1]), tape)
     mis_overhead2 = isempty(tape2) ? 0 : sum(x->mis_overhead(x[1]), tape2)
